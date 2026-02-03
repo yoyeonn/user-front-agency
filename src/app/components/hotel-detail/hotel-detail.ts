@@ -32,7 +32,7 @@ export class HotelDetail implements OnInit, OnDestroy {
   selectedImageIndex = 0;
   autoSlideInterval: any;
   
-  bookingMessage = '';          // ✅ message under button
+  bookingMessage = '';          // message under button
   bookingMessageType: 'error' | 'success' = 'error';
 
   constructor(
@@ -227,8 +227,6 @@ export class HotelDetail implements OnInit, OnDestroy {
     this.lastReservationId = created.id;
     this.bookingMessage = "Réservation enregistrée ✅";
 
-    // ✅ OPTIONAL: download PDF only if user wants (avoid failing booking UX)
-    // await this.invoiceService.downloadInvoicePdf(created.id);
 
   } catch (err: any) {
     console.error("RESERVE ERROR:", err);
@@ -324,7 +322,6 @@ mealPlanLabel(plan: MealPlan) {
   }
 }
 
-/** Adjust these values however you want */
 mealPlanExtra(plan: MealPlan): number {
   switch (plan) {
     case 'ROOM_ONLY': return 0;
@@ -371,7 +368,7 @@ normalizeOccupancy(br: { room: Room; adults: number; children: number; babies: n
   br.children = Number(br.children || 0);
   br.babies = Number(br.babies || 0);
 
-  // adults min = 1 (optional, keep if you want)
+  // adults min = 1 
   if (br.adults < 1) br.adults = 1;
   if (br.children < 0) br.children = 0;
   if (br.babies < 0) br.babies = 0;
@@ -384,7 +381,7 @@ normalizeOccupancy(br: { room: Room; adults: number; children: number; babies: n
     const overflow = total - cap;
     br.children = Math.max(0, br.children - overflow);
 
-    // if still overflow (rare), reduce adults
+    // if still overflow, reduce adults
     const total2 = br.adults + br.children;
     if (total2 > cap) {
       br.adults = Math.max(1, br.adults - (total2 - cap));
@@ -400,7 +397,7 @@ getRoomGuests(br: { adults: number; children: number; babies: number }) {
 getRoomTotalPerNight(br: { room: Room; adults: number; children: number; babies: number }) {
   // babies not counted in price
   const guests = this.getRoomGuests(br);
-  const pricePerPerson = br.room.price || 0; // if your room.price is per person
+  const pricePerPerson = br.room.price || 0;
   return guests * pricePerPerson;
 }
 

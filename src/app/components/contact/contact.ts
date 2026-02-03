@@ -108,7 +108,7 @@ ngAfterViewInit(): void {
       this.form.reset();
       this.loading = false;
 
-      // ✅ force UI refresh
+      // force UI refresh
       this.cdr.detectChanges();
     },
     error: (err: HttpErrorResponse) => {
@@ -116,7 +116,7 @@ ngAfterViewInit(): void {
       this.errorMsg = err?.error?.message || "Échec de l'envoi. Réessayez plus tard ❌";
       this.loading = false;
 
-      // ✅ force UI refresh
+      // force UI refresh
       this.cdr.detectChanges();
     }
   });

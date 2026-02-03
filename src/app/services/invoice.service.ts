@@ -146,7 +146,7 @@ export class InvoiceService {
 
     y += 10;
 
-    // ---- FORMULA (this was overlapping before ✅) ----
+    // ---- FORMULA ----
     doc.setFontSize(10);
     doc.setTextColor(80);
     doc.text(`Formule: ${planLabel}`, 14, y);

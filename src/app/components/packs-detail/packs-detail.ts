@@ -189,7 +189,7 @@ export class PacksDetail implements OnInit, OnDestroy {
     this.bookingRooms.splice(index, 1);
   }
 
-  // ===== Formula helpers (same idea as hotel) =====
+  // ===== Formula helpers =====
   mealPlanLabel(plan: MealPlan) {
     switch (plan) {
       case 'ROOM_ONLY': return "Hébergement seul (chambre)";
@@ -297,15 +297,15 @@ export class PacksDetail implements OnInit, OnDestroy {
       checkIn,
       checkOut,
 
-      // ✅ computed from rooms (frontend removed manual inputs)
+      // computed from rooms (frontend removed manual inputs)
       adults: this.totalAdults,
       children: this.totalChildren,
 
-      // ✅ formula
+      // formula
       mealPlan: this.booking.mealPlan,
       mealPlanExtra: this.mealPlanExtra(this.booking.mealPlan),
 
-      // ✅ total = (pack price + meal extra) * people * nights
+      // total = (pack price + meal extra) * people * nights
       totalAmount: this.totalAmount,
 
       roomIds: csv(this.bookingRooms.map(br => br.room.id)),

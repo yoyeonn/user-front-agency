@@ -94,7 +94,7 @@ export class Profil implements OnInit {
 
   packReservations: PackReservationRow[] = [];
 
-  // ✅ NEW: show loading per reservation download
+  //show loading per reservation download
   downloadingId: number | null = null;
 
   destinationReservations: DestinationReservationRow[] = [];
@@ -156,7 +156,7 @@ export class Profil implements OnInit {
     }
   }
 
-  // ✅ Use the same InvoiceService PDF style (the fixed one)
+  // same InvoiceService PDF style
   async onDownload(r: ReservationRow) {
     this.downloadingId = r.id;
     this.cdr.markForCheck();

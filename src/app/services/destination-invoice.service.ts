@@ -34,7 +34,7 @@ export class DestinationInvoiceService {
     const totalAmount =
       inv.totalAmount != null ? Number(inv.totalAmount) : pricePerPerson * people * nights;
 
-    // ===== Header (same clean style) =====
+    // ===== Header =====
     let y = 18;
 
     doc.setTextColor(0);
