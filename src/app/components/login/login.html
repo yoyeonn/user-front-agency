@@ -4,6 +4,10 @@
     <input type="email" placeholder="Email" [(ngModel)]="email" name="email" required>
     <input type="password" placeholder="Mot de passe" [(ngModel)]="password" name="password" required>
     <button type="submit">Se connecter</button>
+    <p style="margin-top:10px;">
+  <a routerLink="/forgot-password">Mot de passe oublié ?</a>
+</p>
+
   </form>
 
   <p *ngIf="message">{{ message }}</p>

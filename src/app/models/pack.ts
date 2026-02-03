@@ -34,6 +34,7 @@ export interface Pack {
   days: number;
   rating: number;
   location: string;
+  map: string;
   description: string;
   about: string;
   images: string[];

@@ -13,6 +13,8 @@ import { Signup } from './components/signup/signup';
 import { Login } from './components/login/login';
 import { Profil } from './components/profil/profil';
 import { AuthGuard } from './services/auth-guard';
+import { ForgotPassword } from './components/forgot-password/forgot-password';
+import { ResetPassword } from './components/reset-password/reset-password';
 
 export const routes: Routes = [
     { path: '', redirectTo: '/home', pathMatch: 'full' },
@@ -28,6 +30,9 @@ export const routes: Routes = [
     { path: 'signup', component: Signup },
     { path: 'login', component: Login },
     { path: 'profil', component: Profil, canActivate: [AuthGuard] },
+    { path: 'forgot-password', component: ForgotPassword },
+    { path: 'reset-password', component: ResetPassword },
+
 ];
 
 

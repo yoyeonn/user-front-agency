@@ -1,14 +1,17 @@
-import { Component, AfterViewInit } from '@angular/core';
+import { Component, AfterViewInit, OnInit, ChangeDetectorRef } from '@angular/core';
 import { RouterLink, RouterModule } from '@angular/router';
+import { Destinations } from '../../models/destinations';
+import { DestinationService } from '../../services/destination.service';
+import { CommonModule } from '@angular/common';
 declare var $: any;
 
 @Component({
   selector: 'app-home',
-  imports: [RouterModule],
+  imports: [RouterModule,CommonModule],
   templateUrl: './home.html',
   styleUrls: ['./home.css'],
 })
-export class Home implements AfterViewInit {
+export class Home implements AfterViewInit,OnInit {
 
   ngAfterViewInit(): void {
     this.contentWayPoint();
@@ -62,5 +65,44 @@ export class Home implements AfterViewInit {
         1000: { items: 3 }
       }
     });
+  }
+
+  destinations: Destinations[] = [];
+  loading = false;
+
+  constructor(private destinationService: DestinationService,private cd: ChangeDetectorRef) {}
+
+  ngOnInit(): void {
+    this.fetchDestinations();
+    this.cd.detectChanges();
+  }
+
+  fetchDestinations() {
+    this.loading = true;
+    this.destinationService.getdestinations().subscribe({
+      next: (data) => {
+        this.destinations = data ?? [];
+        this.loading = false;
+        setTimeout(() => {
+        this.contentWayPoint();
+        this.initOwlCarousel();
+      });
+      this.cd.detectChanges();
+      },
+      error: (err) => {
+        console.error('Failed to load destinations', err);
+        this.loading = false;
+      },
+    });
+  }
+
+  // Use the first image from DB, otherwise fallback
+  coverImage(d: Destinations): string {
+    const img = d?.images?.length ? d.images[0] : 'assets/images/destination-placeholder.jpg';
+    return img;
+  }
+
+  trackById(_index: number, item: Destinations) {
+    return item.id;
   }
 }

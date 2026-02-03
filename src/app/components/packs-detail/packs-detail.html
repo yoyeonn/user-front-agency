@@ -3,150 +3,238 @@
 
     <!-- Header -->
     <div class="row mb-4 align-items-center">
-        <div class="col-md-8">
-          <h1 class="hotel-name">{{pack.name}}</h1>
-          <span class="days">{{ pack.days || 1 }} jours de circuit</span>
-          <p class="text-muted"><span class="fa fa-map-marker"></span> {{pack.country}} - {{pack.location}}</p>
-        </div>
-        <div class="col-md-4 text-md-right mt-3 mt-md-0">
-          <h3 class="price">{{ pack.price }} TND / personne</h3>
-          <button class="btn btn-success btn-lg" (click)="bookPack()">Réserver Maintenant</button>
-        </div>
+      <div class="col-md-8">
+        <h1 class="hotel-name">{{ pack.name }}</h1>
+        <span class="days">{{ pack.days || 1 }} jours de circuit</span>
+        <p class="text-muted"><span class="fa fa-map-marker"></span> {{ pack.location }}</p>
       </div>
+
+      <div class="col-md-4 text-md-right mt-3 mt-md-0">
+        <h3 class="price">{{ pack.price }} TND / personne / nuit</h3>
+
+        <button class="btn btn-success btn-lg" (click)="bookPack($event)">
+          Réserver Maintenant
+        </button>
+
+        <div *ngIf="bookingMessage"
+             class="mt-2"
+             [class.text-success]="bookingMessageType==='success'"
+             [class.text-danger]="bookingMessageType==='error'">
+          {{ bookingMessage }}
+        </div>
+
+        <button *ngIf="bookingMessageType==='success'"
+                class="btn btn-outline-primary btn-lg mt-2"
+                (click)="downloadLatestFacture()">
+          Télécharger la facture (PDF)
+        </button>
+      </div>
+    </div>
 
     <!-- Carousel + Booking -->
     <div class="row mb-5">
-      
+
       <div class="col-md-8">
         <div class="main-image mb-3" (mouseenter)="pauseAutoSlide()" (mouseleave)="resumeAutoSlide()">
-          <img *ngFor="let img of pack.images; let i=index" [src]="img" [class.active]="i === selectedImageIndex"
-            class="carousel-img">
+          <img *ngFor="let img of pack.images; let i=index"
+               [src]="img"
+               [class.active]="i === selectedImageIndex"
+               class="carousel-img">
 
           <button (click)="prevImage()" class="carousel-arrow left">&#10094;</button>
           <button (click)="nextImage()" class="carousel-arrow right">&#10095;</button>
         </div>
 
         <div class="carousel-dots d-flex justify-content-center mt-2">
-          <span *ngFor="let img of pack.images; let i=index" [class.active]="i === selectedImageIndex"
-            (click)="selectImage(i)"></span>
+          <span *ngFor="let img of pack.images; let i=index"
+                [class.active]="i === selectedImageIndex"
+                (click)="selectImage(i)"></span>
         </div>
 
         <div class="thumbnail-images d-flex flex-wrap gap-2 mt-2">
-          <div *ngFor="let img of pack.images; let i=index" class="thumbnail-wrapper" (click)="selectImage(i)">
+          <div *ngFor="let img of pack.images; let i=index"
+               class="thumbnail-wrapper"
+               (click)="selectImage(i)">
             <img [src]="img" [class.selected]="i === selectedImageIndex" class="rounded">
           </div>
         </div>
       </div>
 
       <div class="col-md-4">
-
         <div class="booking mb-4">
           <h4>Planifiez Votre Forfait</h4>
 
           <div class="mb-3">
-                <label>Arrivée :</label>
-                <input type="date" [(ngModel)]="booking.checkin" name="checkin" required>
-          </div>
-          <div class="mb-3">
-                <label>Départ :</label>
-                <input type="date" [(ngModel)]="booking.checkout" name="checkout" required>
+            <label>Arrivée :</label>
+            <input type="date" [(ngModel)]="booking.checkin" [min]="today" name="checkin" required>
           </div>
 
           <div class="mb-3">
-            <label>Adultes</label>
-            <input type="number" [(ngModel)]="selectedPackage.adults" name="adults" min="1" class="form-control">
+            <label>Départ :</label>
+            <input type="date" [(ngModel)]="booking.checkout" [min]="booking.checkin || today" name="checkout" required>
           </div>
 
+          <!-- ✅ FORMULE -->
           <div class="mb-3">
-            <label>Enfants (2-11 ans)</label>
-            <input type="number" [(ngModel)]="selectedPackage.children" name="children" min="0" class="form-control">
+            <label>Formule</label>
+            <select class="form-control" [(ngModel)]="booking.mealPlan" name="mealPlan" required>
+              <option [ngValue]="'ROOM_ONLY'">Hébergement seul (chambre)</option>
+              <option [ngValue]="'BB'">Petit-déjeuner inclus</option>
+              <option [ngValue]="'HB'">Demi-pension (petit-déjeuner + 1 repas)</option>
+              <option [ngValue]="'FB'">Pension complète (petit-déjeuner + déjeuner + dîner)</option>
+              <option [ngValue]="'AI'">Tout compris</option>
+              <option [ngValue]="'UAI'">Ultra tout compris (extras inclus)</option>
+            </select>
+
+            <small class="text-muted d-block mt-1">
+              {{ mealPlanLabel(booking.mealPlan) }}
+              <span *ngIf="mealPlanExtra(booking.mealPlan) > 0">
+                • +{{ mealPlanExtra(booking.mealPlan) }} TND / personne / nuit
+              </span>
+            </small>
           </div>
 
           <!-- Trigger Modal -->
-          <div class="booking-room-trigger" (click)="openRoomModal()">
+          <button type="button"
+                  class="booking-room-trigger"
+                  (click)="openRoomModal($event)">
             Chambres et occupation
-          </div>
+          </button>
 
           <!-- Modal -->
           <div class="room-modal" *ngIf="showRoomModal">
-            <div class="modal-backdrop" (click)="closeRoomModal()"></div>
+            <div class="modal-backdrop" (click)="closeRoomModal($event)"></div>
+
             <div class="modal-content" [ngClass]="{'open': showRoomModal}">
               <h4>Chambres et Occupation</h4>
 
-              <!-- Selected Booking Rooms -->
               <div *ngFor="let br of bookingRooms; let i = index" class="room-selection">
                 <h5>{{ br.room.name }}</h5>
                 <p class="text-muted">{{ br.room.description }}</p>
 
                 <div class="input-row">
                   <label>Adultes</label>
-                  <input type="number" [(ngModel)]="br.adults" [name]="'adults'+i" min="1" [max]="br.room.capacity" required>
+                  <input type="number"
+                         [(ngModel)]="br.adults"
+                         [name]="'adults'+i"
+                         min="0"
+                         [max]="br.room.capacity"
+                         required>
                 </div>
 
                 <div class="input-row">
                   <label>Enfants (2-11 ans)</label>
-                  <input type="number" [(ngModel)]="br.children" [name]="'children'+i" min="0" [max]="br.room.capacity - br.adults">
+                  <input type="number"
+                         [(ngModel)]="br.children"
+                         [name]="'children'+i"
+                         min="0"
+                         [max]="br.room.capacity - br.adults">
                 </div>
 
                 <div class="input-row">
                   <label>Bébés (0-2 ans)</label>
-                  <input type="number" [(ngModel)]="br.babies" [name]="'babies'+i" min="0" max="1">
+                  <input type="number"
+                         [(ngModel)]="br.babies"
+                         [name]="'babies'+i"
+                         min="0"
+                         max="5">
                 </div>
 
                 <p><b>{{ br.room.price }} TND</b> / nuit — Capacité : {{ br.room.capacity }}</p>
 
-                <button class="remove-room" *ngIf="bookingRooms.length > 1" (click)="removeRoom(i)">
+                <button class="remove-room"
+                        type="button"
+                        *ngIf="bookingRooms.length > 1"
+                        (click)="removeRoom(i)">
                   Supprimer cette chambre
                 </button>
               </div>
 
-              <!-- Dropdown to add a new room -->
-              <div *ngIf="pack.hotel.rooms?.length" class="mt-2">
-                <select [(ngModel)]="selectedRoomToAdd" name="selectRoom" class="form-select mb-2">
+              <div *ngIf="pack.hotel?.rooms?.length" class="mt-2">
+                <select [(ngModel)]="selectedRoomToAdd"
+                        name="selectRoom"
+                        class="form-select mb-2">
                   <option [ngValue]="null">-- Choisir une chambre --</option>
                   <option *ngFor="let r of pack.hotel.rooms" [ngValue]="r">
                     {{ r.name }} - {{ r.capacity }} personnes — {{ r.price }} TND
                   </option>
                 </select>
 
-                <button class="btn btn-success" (click)="addRoom(selectedRoomToAdd)" [disabled]="!selectedRoomToAdd">
+                <button class="btn btn-success"
+                        type="button"
+                        (click)="addRoom(selectedRoomToAdd)"
+                        [disabled]="!selectedRoomToAdd">
                   + Ajouter cette chambre
                 </button>
               </div>
 
+              <div class="mt-3 p-2" style="border-top:1px solid #eee;">
+                <p style="margin:0;">
+                  <b>Total personnes (adultes + enfants):</b> {{ totalPeople }}
+                </p>
+              </div>
+
               <div class="modal-actions mt-3">
-                <button class="btn btn-primary" (click)="closeRoomModal()">Valider</button>
+                <button class="btn btn-primary" type="button" (click)="closeRoomModal($event)">
+                  Valider
+                </button>
               </div>
             </div>
           </div>
 
-          <div class="booking-summary mt-2">
-            <p>Total des voyageurs : {{ selectedPackage.adults + selectedPackage.children }}</p>
-            <p>Prix total : {{ (selectedPackage.adults + selectedPackage.children) * pack.price }} TND</p>
+          <!-- Summary -->
+          <div class="booking-summary mt-3">
+            <p><b>Voyageurs (payants):</b> {{ totalPeople }}</p>
+            <p><b>Nuits:</b> {{ nights }}</p>
+
+            <p class="text-muted mb-1">
+              Base pack: {{ basePackTotal }} TND
+            </p>
+
+            <p class="text-muted mb-1" *ngIf="mealPlanExtra(booking.mealPlan) > 0">
+              Supplément formule: {{ mealPlanTotal }} TND
+            </p>
+
+            <p><b>Total:</b> {{ totalAmount }} TND</p>
           </div>
 
-          <button class="btn btn-primary btn-block" (click)="bookPack()">Réserver Maintenant</button>
+          <button class="btn btn-primary btn-block" (click)="bookPack($event)">
+            Réserver Maintenant
+          </button>
+
+          <div *ngIf="bookingMessage"
+               class="mt-2"
+               [class.text-success]="bookingMessageType==='success'"
+               [class.text-danger]="bookingMessageType==='error'">
+            {{ bookingMessage }}
+          </div>
+
+          <button *ngIf="bookingMessageType==='success'"
+                  class="btn btn-outline-primary btn-lg mt-2"
+                  (click)="downloadLatestFacture()">
+            Télécharger la facture (PDF)
+          </button>
         </div>
       </div>
     </div>
 
     <!-- Description -->
     <div class="row mb-4">
-        <div class="col-md-12">
-          <h4>Description</h4>
-          <p>{{pack.description}}</p>
-          <h4 class="mt-4">À propos de l'hôtel</h4>
-          <p>{{pack.about}}</p>
-        </div>
+      <div class="col-md-12">
+        <h4>Description</h4>
+        <p>{{ pack.description }}</p>
+        <h4 class="mt-4">À propos de l'hôtel</h4>
+        <p>{{ pack.about }}</p>
       </div>
+    </div>
 
     <!-- Itinerary -->
-    <div class="row mb-4" *ngIf="pack.activities.length">
+    <div class="row mb-4" *ngIf="pack.activities?.length">
       <div class="col-md-12">
         <h4>Programme</h4>
         <ul class="timeline">
           <li *ngFor="let act of pack.activities">
-            <strong>Jour {{ act.day }} : </strong>{{ act.activity }}
+            <strong>Jour {{ act.day }} :</strong> {{ act.activity }}
           </li>
         </ul>
       </div>
@@ -159,7 +247,7 @@
         </div>
         <div class="col-md-4 mb-3 d-flex" *ngFor="let r of pack.hotel.rooms">
           <div class="card room-card flex-fill">
-            <img [src]="'images/' + r.image" class="card-img-top" alt="{{ r.name }}">
+            <img [src]="imageUrl(r.image)" class="card-img-top" alt="{{ r.name }}">
             <div class="card-body d-flex flex-column">
               <h5>{{r.name}}</h5>
               <p class="text-muted flex-grow-1">{{r.description}}</p>
@@ -174,8 +262,15 @@
       <div class="row mb-4">
         <div class="col-md-8">
           <h4>Emplacement</h4>
-          <iframe width="100%" height="300" style="border:0;border-radius:10px;" loading="lazy" allowfullscreen>
-          </iframe>
+         <iframe
+           width="600"
+            height="450"
+            style="border:0;"
+            allowfullscreen
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"
+          [src]="mapUrl">
+        </iframe>
         </div>
         <div class="col-md-4">
           <h4>Endroits populaires à proximité</h4>
@@ -234,4 +329,6 @@
     </div>
 
   </div>
+
+
 </section>

@@ -23,7 +23,7 @@
         <!-- Left: Carousel -->
         <div class="col-md-8">
           <div class="main-image mb-3" (mouseenter)="pauseAutoSlide()" (mouseleave)="resumeAutoSlide()">
-            <img *ngFor="let img of hotel.images; let i = index" [src]="'images/' + img"
+            <img *ngFor="let img of hotel.images; let i = index" [src]="imageUrl(img)"
               [class.active]="i === selectedImageIndex" class="carousel-img">
 
             <button (click)="prevImage()" class="carousel-arrow left">&#10094;</button>
@@ -37,7 +37,7 @@
 
           <div class="thumbnail-images d-flex flex-wrap gap-2 mt-2">
             <div *ngFor="let img of hotel.images; let i = index" class="thumbnail-wrapper" (click)="selectImage(i)">
-              <img [src]="'images/' + img" [class.selected]="selectedImageIndex === i" class="rounded">
+              <img [src]="imageUrl(img)" [class.selected]="selectedImageIndex === i" class="rounded">
             </div>
           </div>
         </div>
@@ -170,6 +170,14 @@
 <div *ngIf="bookingMessage" class="booking-error">
   {{ bookingMessage }}
 </div>
+<button
+  *ngIf="bookingMessageType === 'success'"
+  type="button"
+  class="btn btn-outline-primary btn-block mt-2"
+  (click)="downloadLatestFacture()"
+>
+  Télécharger la facture (PDF)
+</button>
 
             </form>
           </div>
@@ -211,7 +219,7 @@
         </div>
         <div class="col-md-4 mb-3 d-flex" *ngFor="let r of hotel.rooms">
           <div class="card room-card flex-fill">
-            <img [src]="'images/' + r.image" class="card-img-top" alt="{{ r.name }}">
+            <img [src]="imageUrl(r.image)" class="card-img-top">
             <div class="card-body d-flex flex-column">
               <h5>{{r.name}}</h5>
               <p class="text-muted flex-grow-1">{{r.description}}</p>
@@ -225,8 +233,18 @@
       <div class="row mb-4">
         <div class="col-md-8">
           <h4>Où vous séjournerez</h4>
-          <iframe width="100%" height="300" style="border:0;border-radius:10px;" loading="lazy" allowfullscreen>
+          <iframe
+            *ngIf="mapUrl"
+            [src]="mapUrl"
+            width="600"
+            height="450"
+            style="border:0;"
+            allowfullscreen
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade">
           </iframe>
+
+
         </div>
         <div class="col-md-4">
           <h4>Lieux populaires à proximité</h4>
@@ -351,7 +369,7 @@
               <div class="hotel-card d-flex flex-column">
                 <div class="hotel-img-wrapper">
                   <div class="hotel-img"
-                    [ngStyle]="{'background-image': 'url(images/' + (h.images[0] || 'default.jpg') + ')'}">
+                    [ngStyle]="{'background-image': 'url(' + imageUrl(h.images?.[0]) + ')'}">
                     <span class="price">{{h.rooms?.[0]?.price || 0}} TND / nuit</span>
                   </div>
                 </div>

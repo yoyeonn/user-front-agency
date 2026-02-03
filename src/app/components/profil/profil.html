@@ -100,9 +100,14 @@
               <td>{{ mealPlanLabel(r.mealPlan) }}</td>
               <td>{{ r.roomNames }}</td>
               <td>
-                <button class="btn btn-outline-success btn-sm" (click)="onDownload(r)">
-                  Télécharger facture
-                </button>
+                <button
+  class="btn btn-outline-success btn-sm"
+  (click)="onDownload(r)"
+  [disabled]="downloadingId === r.id"
+>
+  {{ downloadingId === r.id ? 'Téléchargement...' : 'Télécharger facture' }}
+</button>
+
               </td>
             </tr>
 
@@ -115,6 +120,96 @@
     </div>
 
   </div>
+
+  <div class="card p-3 mt-4">
+  <h5>Historique des destinations / factures</h5>
+
+  <div *ngIf="loading">Chargement...</div>
+  <div *ngIf="error" class="text-danger">{{ error }}</div>
+
+  <div class="table-responsive" *ngIf="!loading && !error">
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Destination</th>
+          <th>Lieu</th>
+          <th>Check-in/out</th>
+          <th>Voyageurs</th>
+          <th>Montant</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr *ngFor="let r of destinationReservations">
+          <td>{{ r.createdAt | date:'short' }}</td>
+          <td>{{ r.destinationName }}</td>
+          <td>{{ r.location }}</td>
+          <td>{{ r.checkIn }} → {{ r.checkOut }}</td>
+          <td>{{ r.adults + r.children }}</td>
+          <td>{{ r.amount | number:'1.2-2' }} TND</td>
+          <td>
+            <button class="btn btn-outline-success btn-sm" (click)="onDownloadDestination(r)">
+              Télécharger facture
+            </button>
+          </td>
+        </tr>
+
+        <tr *ngIf="destinationReservations.length === 0">
+          <td colspan="7" class="text-center">Aucune réservation destination.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card p-3 mt-4">
+  <h5>Historique des packs / factures</h5>
+
+  <div *ngIf="loading">Chargement...</div>
+  <div *ngIf="error" class="text-danger">{{ error }}</div>
+
+  <div class="table-responsive" *ngIf="!loading && !error">
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Pack</th>
+          <th>Hôtel</th>
+          <th>Destination</th>
+          <th>Check-in/out</th>
+          <th>Voyageurs</th>
+          <th>Montant</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr *ngFor="let r of packReservations">
+          <td>{{ r.createdAt | date:'short' }}</td>
+          <td>{{ r.packName }}</td>
+          <td>{{ r.hotelName || '—' }}</td>
+          <td>{{ r.destinationName || '—' }}</td>
+          <td>{{ r.checkIn }} → {{ r.checkOut }}</td>
+          <td>{{ r.adults + r.children }}</td>
+          <td>{{ r.amount | number:'1.2-2' }} TND</td>
+          <td>
+            <button class="btn btn-outline-success btn-sm" (click)="onDownloadPack(r)">
+              Télécharger facture
+            </button>
+          </td>
+        </tr>
+
+        <tr *ngIf="packReservations.length === 0">
+          <td colspan="8" class="text-center">Aucune réservation pack.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
 
   <ng-template #noUser>
     <p>Vous n'êtes pas connecté.</p>

@@ -32,7 +32,7 @@ export interface ProgrammeDay {
 export interface Hotel {
   id: number;
   name: string;
-  location: string;
+  map: string;
   city: string;
   country: string;
   price?: number;

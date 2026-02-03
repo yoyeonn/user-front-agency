@@ -12,6 +12,7 @@ export interface Destinations {
   faq: Faq[];
   reviews: Review[];
   location:string;
+  map: string;
   nearby: Nearby[];
   title: string;
 }

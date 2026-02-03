@@ -204,4 +204,12 @@ onKeyDown(event: KeyboardEvent) {
   }
 }
 
+imageUrl(img: string | null | undefined): string {
+  if (!img) return 'images/default.jpg';
+
+  if (img.startsWith('http://') || img.startsWith('https://')) return img;
+
+  return 'images/' + img;
+}
+
 }

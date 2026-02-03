@@ -19,7 +19,7 @@
          <span class="fa fa-map-marker"></span>
        </div>
        <h3 class="mb-2">Adresse</h3>
-       <p>198 West 21th Street, Suite 721 New York NY 10016</p>
+       <p>Cité Ettahrir, Tunis, Tunisie</p>
      </div>
    </div>
    <div class="col-md-3 d-flex">
@@ -28,7 +28,7 @@
        <span class="fa fa-phone"></span>
      </div>
      <h3 class="mb-2">Numéro de téléphone</h3>
-     <p><a href="tel://1234567920">+ 1235 2355 98</a></p>
+     <p><a href="tel://1234567920">+216 12345678</a></p>
    </div>
  </div>
  <div class="col-md-3 d-flex">
@@ -37,7 +37,7 @@
      <span class="fa fa-paper-plane"></span>
    </div>
    <h3 class="mb-2">Adresse e-mail</h3>
-   <p><a href="mailto:info@yoursite.com">info@yoursite.com</a></p>
+   <p><a href="mailto:youssefkanoun4@gmail.com">youssefkanoun4@gmail.com</a></p>
  </div>
 </div>
 <div class="col-md-3 d-flex">
@@ -57,27 +57,56 @@
   <div class="container">
     <div class="row block-9">
       <div class="col-md-6 order-md-last d-flex">
-        <form action="#" class="bg-light p-5 contact-form">
-          <div class="form-group">
-            <input type="text" class="form-control" placeholder="Votre nom">
-          </div>
-          <div class="form-group">
-            <input type="text" class="form-control" placeholder="Votre e-mail">
-          </div>
-          <div class="form-group">
-            <input type="text" class="form-control" placeholder="Objet">
-          </div>
-          <div class="form-group">
-            <textarea name="" id="" cols="30" rows="7" class="form-control" placeholder="Message"></textarea>
-          </div>
-          <div class="form-group">
-            <input type="submit" value="Envoyer le message" class="btn btn-primary py-3 px-5">
-          </div>
-        </form>
+        <form [formGroup]="form" (ngSubmit)="submit()" class="bg-light p-5 contact-form">
+
+  <div class="form-group">
+    <input type="text" class="form-control" placeholder="Votre nom" formControlName="name">
+    <small class="text-danger" *ngIf="hasError('name','required')">Nom requis</small>
+    <small class="text-danger" *ngIf="hasError('name','minlength')">Minimum 2 caractères</small>
+  </div>
+
+  <div class="form-group">
+    <input type="email" class="form-control" placeholder="Votre e-mail" formControlName="email">
+    <small class="text-danger" *ngIf="hasError('email','required')">Email requis</small>
+    <small class="text-danger" *ngIf="hasError('email','email')">Email invalide</small>
+  </div>
+
+  <div class="form-group">
+    <input type="text" class="form-control" placeholder="Objet" formControlName="subject">
+    <small class="text-danger" *ngIf="hasError('subject','required')">Objet requis</small>
+  </div>
+
+  <div class="form-group">
+    <textarea cols="30" rows="7" class="form-control" placeholder="Message" formControlName="message"></textarea>
+    <small class="text-danger" *ngIf="hasError('message','required')">Message requis</small>
+    <small class="text-danger" *ngIf="hasError('message','minlength')">Minimum 10 caractères</small>
+  </div>
+
+  <div class="form-group">
+    <button type="submit" class="btn btn-primary py-3 px-5" [disabled]="loading">
+    {{ loading ? 'Envoi...' : 'Envoyer le message' }}
+  </button>
+  </div>
+
+  <div *ngIf="successMsg" class="alert alert-success mt-3">{{ successMsg }}</div>
+  <div *ngIf="errorMsg" class="alert alert-danger mt-3">{{ errorMsg }}</div>
+</form>
+
       </div>
 
       <div class="col-md-6 d-flex">
-       <div id="map" class="bg-white"></div>
+       <div class="bg-white" style="width:100%; min-height: 450px;">
+  <iframe
+    width="100%"
+    height="450"
+    style="border:0;"
+    loading="lazy"
+    allowfullscreen
+    referrerpolicy="no-referrer-when-downgrade"
+    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d30570.64633225455!2d10.115481600000004!3d36.83165840000001!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x12fd32fcf030f477%3A0x4c7d6c07bda4b39!2sEnda%20inter-arabe%20ONG!5e1!3m2!1sfr!2stn!4v1769895058963!5m2!1sfr!2stn">
+  </iframe>
+</div>
+
      </div>
    </div>
  </div>

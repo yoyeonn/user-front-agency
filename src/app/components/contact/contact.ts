@@ -1,11 +1,14 @@
-import { Component } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { ChangeDetectorRef, Component, NgZone } from '@angular/core';
+import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { ContactService } from '../../services/contact.service';
 
 declare var $: any;
 
 @Component({
   selector: 'app-contact',
-  imports: [RouterModule],
+  imports: [RouterModule,FormsModule,ReactiveFormsModule],
   templateUrl: './contact.html',
   styleUrl: './contact.css',
 })
@@ -13,6 +16,8 @@ export class Contact {
 ngAfterViewInit(): void {
     this.contentWayPoint();
     this.initOwlCarousel();
+
+    this.cdr.detectChanges();
   }
 
   private contentWayPoint(): void {
@@ -38,8 +43,7 @@ ngAfterViewInit(): void {
         }
       }, { offset: '95%' });
     });
-
-    // Trigger reflow to fix initial layout
+    
     setTimeout(() => {
       $(window).trigger('resize').trigger('scroll');
     }, 100);
@@ -62,5 +66,66 @@ ngAfterViewInit(): void {
         1000: { items: 3 }
       }
     });
+  }
+
+   loading = false;
+  successMsg = '';
+  errorMsg = '';
+  form!: FormGroup;
+ 
+
+  constructor(
+    private fb: FormBuilder,
+    private contactService: ContactService,
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone
+  ) {
+    this.form = this.fb.group({
+      name: ['', [Validators.required, Validators.minLength(2)]],
+      email: ['', [Validators.required, Validators.email]],
+      subject: ['', [Validators.required, Validators.minLength(3)]],
+      message: ['', [Validators.required, Validators.minLength(10)]],
+    });
+  }
+
+  submit() {
+  this.successMsg = '';
+  this.errorMsg = '';
+    console.log('Form Data:', this.form.value);
+  if (this.form.invalid) {
+    Object.entries(this.form.controls).forEach(([key, control]) => {
+    console.log(key, control.value, control.errors);
+  });
+    this.form.markAllAsTouched();
+    return;
+  }
+
+  this.loading = true;
+
+  this.contactService.sendMessage(this.form.value).subscribe({
+    next: (res: any) => {
+      this.successMsg = res?.message || 'Votre message a été envoyé avec succès ✅';
+      this.form.reset();
+      this.loading = false;
+
+      // ✅ force UI refresh
+      this.cdr.detectChanges();
+    },
+    error: (err: HttpErrorResponse) => {
+      console.error(err);
+      this.errorMsg = err?.error?.message || "Échec de l'envoi. Réessayez plus tard ❌";
+      this.loading = false;
+
+      // ✅ force UI refresh
+      this.cdr.detectChanges();
+    }
+  });
+}
+
+
+  // helper for template
+  hasError(controlName: string, error: string) {
+    const c = this.form.get(controlName);
+    return !!(c && c.touched && c.hasError(error));
   }
 }

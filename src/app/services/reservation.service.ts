@@ -1,5 +1,4 @@
 import { Injectable } from '@angular/core';
-import axios from 'axios';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
@@ -22,29 +21,33 @@ export class ReservationService {
 
   constructor(private http: HttpClient) {}
 
-
-  private authHeaders() {
+  private authHeaders(): HttpHeaders {
     const token = localStorage.getItem('token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : new HttpHeaders();
   }
 
   async getMyReservations(): Promise<ReservationRow[]> {
-  const token = localStorage.getItem('token');
+    return await firstValueFrom(
+      this.http.get<ReservationRow[]>(`${this.RES_URL}/me`, {
+        headers: this.authHeaders(),
+      })
+    );
+  }
 
-  const headers = token
-    ? new HttpHeaders({ Authorization: `Bearer ${token}` })
-    : undefined;
+  async getInvoiceJson(reservationId: number): Promise<any> {
+    return await firstValueFrom(
+      this.http.get<any>(`${this.RES_URL}/${reservationId}/invoice`, {
+        headers: this.authHeaders(),
+      })
+    );
+  }
 
-  return await firstValueFrom(
-    this.http.get<ReservationRow[]>(`${this.RES_URL}/me`, { headers })
-  );
-}
-
-
-  async downloadInvoice(reservationId: number): Promise<Blob> {
-    const res = await axios.get(`${this.RES_URL}/${reservationId}/invoice`, {
-      headers: this.authHeaders(),
-    });
-    return res.data;
+  async downloadInvoicePdf(reservationId: number): Promise<Blob> {
+    return await firstValueFrom(
+      this.http.get(`${this.RES_URL}/${reservationId}/invoice.pdf`, {
+        headers: this.authHeaders(),
+        responseType: 'blob',
+      })
+    );
   }
 }

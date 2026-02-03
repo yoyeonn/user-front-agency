@@ -7,22 +7,22 @@
         <h1 class="destination-name">{{ destination.name }}</h1>
         <span class="days">{{ destination.days || 1 }} Jours de Tour</span>
         <p class="text-muted"><span class="fa fa-map-marker"></span> {{ destination.country }}</p>
+
         <div class="stars mb-2">
           <div class="stars-wrapper">
-            <!-- Gray background stars -->
             <i class="fa fa-star" *ngFor="let star of [1,2,3,4,5]"></i>
-
-            <!-- Gold overlay according to rating -->
             <div class="stars-inner" [style.width.%]="(averageRating / 5) * 100">
               <i class="fa fa-star" *ngFor="let star of [1,2,3,4,5]"></i>
             </div>
           </div>
         </div>
-
       </div>
+
       <div class="col-md-4 text-md-right mt-3 mt-md-0">
         <h3>{{ destination.price }} TND / personne</h3>
-        <button class="btn btn-success btn-lg" (click)="bookTrip()">Réserver maintenant</button>
+        <button class="btn btn-success btn-lg" (click)="bookTrip()">
+          Réserver maintenant
+        </button>
       </div>
     </div>
 
@@ -30,20 +30,25 @@
     <div class="row mb-5">
       <div class="col-md-8">
         <div class="main-image mb-3" (mouseenter)="pauseAutoSlide()" (mouseleave)="resumeAutoSlide()">
-          <img *ngFor="let img of destination.images; let i=index" [src]="img" [class.active]="i === selectedImageIndex"
-            class="carousel-img">
+          <img *ngFor="let img of destination.images; let i=index"
+               [src]="img"
+               [class.active]="i === selectedImageIndex"
+               class="carousel-img">
 
           <button (click)="prevImage()" class="carousel-arrow left">&#10094;</button>
           <button (click)="nextImage()" class="carousel-arrow right">&#10095;</button>
         </div>
 
         <div class="carousel-dots d-flex justify-content-center mt-2">
-          <span *ngFor="let img of destination.images; let i=index" [class.active]="i === selectedImageIndex"
-            (click)="selectImage(i)"></span>
+          <span *ngFor="let img of destination.images; let i=index"
+                [class.active]="i === selectedImageIndex"
+                (click)="selectImage(i)"></span>
         </div>
 
         <div class="thumbnail-images d-flex flex-wrap gap-2 mt-2">
-          <div *ngFor="let img of destination.images; let i=index" class="thumbnail-wrapper" (click)="selectImage(i)">
+          <div *ngFor="let img of destination.images; let i=index"
+               class="thumbnail-wrapper"
+               (click)="selectImage(i)">
             <img [src]="img" [class.selected]="i === selectedImageIndex" class="rounded">
           </div>
         </div>
@@ -51,40 +56,98 @@
 
       <!-- Booking Panel -->
       <div class="col-md-4">
-        <div class="booking">
+        <div class="booking" id="bookingPanel">
           <h4>Planifiez Votre Voyage</h4>
 
           <div class="mb-2">
             <label>Date d'arrivée :</label>
-            <input type="date" [(ngModel)]="selectedPackage.checkIn" name="checkIn" [min]="today" (change)="onCheckInChange()" required>
+            <input
+              type="date"
+              [(ngModel)]="selectedPackage.checkIn"
+              name="checkIn"
+              [min]="today"
+              (change)="onCheckInChange()"
+              required
+            >
+            <div *ngIf="showErrors && bookingErrors.checkIn" class="text-danger mt-1">
+              {{ bookingErrors.checkIn }}
+            </div>
           </div>
 
           <div class="mb-2">
             <label>Date de départ :</label>
-            <input type="date" [(ngModel)]="selectedPackage.checkOut" name="checkOut" [min]="selectedPackage.checkIn || today" required>
+            <input
+              type="date"
+              [(ngModel)]="selectedPackage.checkOut"
+              name="checkOut"
+              [min]="selectedPackage.checkIn || today"
+              (change)="onCheckOutChange()"
+              required
+            >
+            <div *ngIf="showErrors && bookingErrors.checkOut" class="text-danger mt-1">
+              {{ bookingErrors.checkOut }}
+            </div>
           </div>
 
           <div class="mb-2">
             <label>Adultes :</label>
-            <input type="number" [(ngModel)]="selectedPackage.adults" min="1">
+            <input type="number" [(ngModel)]="selectedPackage.adults" min="1" (ngModelChange)="onPeopleChange()">
           </div>
 
           <div class="mb-2">
             <label>Enfants (2-11 ans) :</label>
-            <input type="number" [(ngModel)]="selectedPackage.children" min="0">
+            <input type="number" [(ngModel)]="selectedPackage.children" min="0" (ngModelChange)="onPeopleChange()">
+            <div *ngIf="showErrors && bookingErrors.people" class="text-danger mt-1">
+              {{ bookingErrors.people }}
+            </div>
           </div>
 
           <div class="booking-summary mt-2">
-            <p>Total des voyageurs : {{ selectedPackage.adults + selectedPackage.children }}</p>
-            <p>Prix total : {{ (selectedPackage.adults + selectedPackage.children) * destination.price }} TND</p>
+            <p>Total des voyageurs : {{ (selectedPackage.adults || 0) + (selectedPackage.children || 0) }}</p>
+
+            <p *ngIf="selectedPackage.checkIn && selectedPackage.checkOut">
+              Nuits : {{ daysBetween(selectedPackage.checkIn, selectedPackage.checkOut) }}
+            </p>
+
+            <p>
+              Prix total :
+              {{
+                ((selectedPackage.adults || 0) + (selectedPackage.children || 0))
+                * (destination.price || 0)
+                * (selectedPackage.checkIn && selectedPackage.checkOut
+                    ? daysBetween(selectedPackage.checkIn, selectedPackage.checkOut)
+                    : 0)
+              }} TND
+            </p>
           </div>
 
-          <button class="btn btn-primary btn-block mt-2" (click)="bookTrip()">Réserver maintenant</button>
+          <button
+            class="btn btn-primary btn-block mt-2"
+            (click)="bookTrip()"
+          >
+            Réserver maintenant
+          </button>
+
+          <!-- global validation message -->
+          <div *ngIf="showErrors && bookingError" class="text-danger mt-2">
+            {{ bookingError }}
+          </div>
+
+          <!-- backend booking message (success/error) -->
           <div *ngIf="bookingMessage"
-              class="booking-error"
-              [ngClass]="{ 'success': bookingMessageType==='success' }">
+               class="booking-error"
+               [ngClass]="{ 'success': bookingMessageType==='success' }">
             {{ bookingMessage }}
           </div>
+
+          <button
+            *ngIf="bookingMessageType === 'success'"
+            type="button"
+            class="btn btn-outline-primary btn-block mt-2"
+            (click)="downloadLatestFacture()"
+          >
+            Télécharger la facture (PDF)
+          </button>
         </div>
       </div>
     </div>
@@ -98,7 +161,6 @@
         <h4 class="mt-4">Description</h4>
         <p>{{ destination.description }}</p>
 
-        <!-- Itinerary -->
         <div *ngIf="destination.activities.length" class="mt-4">
           <h4>Programme</h4>
           <ul class="programme-list list-group list-group-flush">
@@ -134,13 +196,22 @@
     <div class="row mb-4">
       <div class="col-md-8">
         <h4>Carte</h4>
-        <iframe width="100%" height="300" style="border:0;border-radius:10px;" loading="lazy" allowfullscreen></iframe>
+        <iframe
+            *ngIf="mapUrl"
+            [src]="mapUrl"
+            width="600"
+            height="450"
+            style="border:0;"
+            allowfullscreen
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade">
+          </iframe>
       </div>
       <div class="col-md-4">
         <h4>À proximité</h4>
         <ul class="nearby">
           <li *ngFor="let n of destination.nearby">
-            <span class="fa fa-map-marker text-danger"></span> {{ n.name }} - {{ n.distance }} KM
+            <span class="fa fa-map-marker text-danger"></span> {{ n.name }} - {{ n.distance }}
           </li>
         </ul>
       </div>
@@ -173,10 +244,11 @@
             <div class="destination-card d-flex flex-column">
               <div class="destination-img-wrapper">
                 <div class="destination-img"
-                  [ngStyle]="{'background-image': 'url(' + (d.images[0] || 'default.jpg') + ')'}">
+                     [ngStyle]="{'background-image': 'url(' + (d.images[0] || 'default.jpg') + ')'}">
                   <span class="price">{{ d.price }} TND / personne</span>
                 </div>
               </div>
+
               <div class="destination-content d-flex flex-column flex-grow-1">
                 <h5 class="destination-name">{{ d.name }}</h5>
                 <p class="description text-muted">{{ d.title }}</p>

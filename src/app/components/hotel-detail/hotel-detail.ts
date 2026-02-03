@@ -1,5 +1,6 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { HotelService } from '../../services/hotel.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -7,6 +8,7 @@ import { Hotel, Room } from '../../models/hotel';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { AuthService } from '../../services/auth.service';
+import { InvoiceService } from '../../services/invoice.service';
 
 type MealPlan = 'ROOM_ONLY' | 'BB' | 'HB' | 'FB' | 'AI' | 'UAI';
 
@@ -18,6 +20,7 @@ type MealPlan = 'ROOM_ONLY' | 'BB' | 'HB' | 'FB' | 'AI' | 'UAI';
 })
 export class HotelDetail implements OnInit, OnDestroy {
   hotel!: Hotel;
+  mapUrl?: SafeResourceUrl;
   relatedHotels: Hotel[] = [];
   bookingRooms: { room: Room; adults: number; children: number; babies: number }[] = [];
   selectedRoomToAdd: Room | null = null;
@@ -36,8 +39,10 @@ export class HotelDetail implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private hotelService: HotelService,
     private router: Router,
+    private sanitizer: DomSanitizer,
     private cd: ChangeDetectorRef,
-    private authService: AuthService
+    private authService: AuthService,
+    private invoiceService: InvoiceService
   ) { }
 
   ngOnInit(): void {
@@ -50,6 +55,10 @@ export class HotelDetail implements OnInit, OnDestroy {
         const allHotels = await this.hotelService.getHotels();
 
         this.hotel = await this.hotelService.getHotelById(id);
+        const raw = this.hotel.map; // string like "https://www.google.com/maps/embed?..."
+        this.mapUrl = raw
+          ? this.sanitizer.bypassSecurityTrustResourceUrl(raw)
+          : undefined;
         if (!this.hotel) {
           this.router.navigate(['/hotel']);
           return;
@@ -64,7 +73,6 @@ export class HotelDetail implements OnInit, OnDestroy {
         this.hotel.faq ??= [];
         this.hotel.reviews ??= [];
         this.hotel.programme ??= [];
-
         this.bookingRooms = this.hotel.rooms.map(r => ({
           room: r,
           adults: Math.min(r.capacity, 2),
@@ -159,17 +167,19 @@ export class HotelDetail implements OnInit, OnDestroy {
 }
 
 
-  async bookHotel(event: Event) {
+ async bookHotel(event: Event) {
   event.preventDefault();
+
   if (!this.authService.isLoggedIn()) {
     this.bookingMessageType = 'error';
     this.bookingMessage = "Vous devez être connecté pour réserver.";
-
-    const returnUrl = this.router.url; // ✅ current page (/hotel/12)
+    const returnUrl = this.router.url;
     this.router.navigate(['/login'], { queryParams: { returnUrl } });
     return;
   }
-  this.bookingError = ''; // reset
+
+  this.bookingError = '';
+  this.bookingMessage = '';
 
   if (!this.booking.checkin || !this.booking.checkout) {
     this.bookingError = "Veuillez sélectionner les dates d’arrivée et de départ.";
@@ -187,51 +197,46 @@ export class HotelDetail implements OnInit, OnDestroy {
     return;
   }
 
-const payload = {
-  hotelId: this.hotel.id,
-  checkIn: this.booking.checkin,
-  checkOut: this.booking.checkout,
-  mealPlan: this.booking.mealPlan,
-  totalAmount: this.getTotalPerNight() * this.daysBetween(this.booking.checkin, this.booking.checkout),
+  const payload = {
+    hotelId: this.hotel.id,
+    checkIn: this.booking.checkin,
+    checkOut: this.booking.checkout,
+    mealPlan: this.booking.mealPlan,
+    totalAmount: this.getTotalReservationAmount(),
+    rooms: this.bookingRooms.map(br => ({
+      roomId: br.room.id,
+      roomName: br.room.name,
+      adults: br.adults,
+      children: br.children,
+      babies: br.babies,
+      pricePerPerson: br.room.price,
+      totalLine: this.getRoomBasePerNight(br) + this.getRoomMealExtraPerNight(br),
+    })),
+  };
 
-  rooms: this.bookingRooms.map(br => ({
-    roomId: br.room.id, 
-    roomName: br.room.name,
-    adults: br.adults,
-    children: br.children,
-    babies: br.babies,
-    pricePerPerson: br.room.price,
-    totalLine: this.getRoomBasePerNight(br) + this.getRoomMealExtraPerNight(br)
-  }))
-};
-
-console.log("RESERVATION PAYLOAD =>", payload);
-
-
-  // 4) call backend
   try {
-    await this.hotelService.reserveHotel(payload);
+    const created = await this.hotelService.reserveHotel(payload);
 
-    this.bookingMessageType = 'success';
-    this.bookingMessage = "Réservation enregistrée ✅";
-
-    // 5) now generate pdf
-    this.downloadFacturePdf();
-  } catch (err: any) {
-    console.error(err);
-    this.bookingMessageType = 'error';
-
-    // helpful message
-    if (err?.response?.status === 401) {
-      this.bookingMessage = "Session expirée. Veuillez vous reconnecter.";
-      const returnUrl = this.router.url;
-      this.router.navigate(['/login'], { queryParams: { returnUrl } });
+    if (!created?.id) {
+      this.bookingMessageType = 'error';
+      this.bookingMessage = "Réservation OK mais ID manquant (backend response).";
       return;
     }
 
-    this.bookingMessage = err?.response?.data?.message || "Erreur lors de l'enregistrement de la réservation.";
+    this.bookingMessageType = 'success';
+    this.lastReservationId = created.id;
+    this.bookingMessage = "Réservation enregistrée ✅";
+
+    // ✅ OPTIONAL: download PDF only if user wants (avoid failing booking UX)
+    // await this.invoiceService.downloadInvoicePdf(created.id);
+
+  } catch (err: any) {
+    console.error("RESERVE ERROR:", err);
+    this.bookingMessageType = 'error';
+    this.bookingMessage = err?.error?.message || "Erreur lors de l'enregistrement de la réservation.";
   }
 }
+
 
 
 
@@ -427,88 +432,108 @@ getRoomMealExtraPerNight(br: { room: Room; adults: number; children: number; bab
   return guests * this.mealPlanExtra(this.booking.mealPlan);
 }
 
-downloadFacturePdf() {
-  const doc = new jsPDF();
-  const now = new Date();
-  const factureNumber = `FAC-${now.getTime()}`;
+// downloadFacturePdf() {
+//   const doc = new jsPDF();
+//   const now = new Date();
+//   const factureNumber = `FAC-${now.getTime()}`;
 
-  const nights = this.daysBetween(this.booking.checkin, this.booking.checkout);
-  const planExtra = this.mealPlanExtra(this.booking.mealPlan);
+//   const nights = this.daysBetween(this.booking.checkin, this.booking.checkout);
+//   const planExtra = this.mealPlanExtra(this.booking.mealPlan);
 
-  const totalRoomsPerNight = this.bookingRooms.reduce((sum, br) => sum + this.getRoomBasePerNight(br), 0);
-  const totalMealPerNight = this.bookingRooms.reduce((sum, br) => sum + this.getRoomMealExtraPerNight(br), 0);
+//   const totalRoomsPerNight = this.bookingRooms.reduce((sum, br) => sum + this.getRoomBasePerNight(br), 0);
+//   const totalMealPerNight = this.bookingRooms.reduce((sum, br) => sum + this.getRoomMealExtraPerNight(br), 0);
 
-  const totalPerNight = totalRoomsPerNight + totalMealPerNight;
-  const total = totalPerNight * nights;
+//   const totalPerNight = totalRoomsPerNight + totalMealPerNight;
+//   const total = totalPerNight * nights;
 
-  // Header
-  doc.setFontSize(16);
-  doc.text('FACTURE - Réservation Hôtel', 14, 18);
+//   // Header
+//   doc.setFontSize(16);
+//   doc.text('FACTURE - Réservation Hôtel', 14, 18);
 
-  doc.setFontSize(10);
-  doc.text(`N° Facture: ${factureNumber}`, 14, 26);
-  doc.text(`Date: ${now.toLocaleDateString()}`, 14, 32);
+//   doc.setFontSize(10);
+//   doc.text(`N° Facture: ${factureNumber}`, 14, 26);
+//   doc.text(`Date: ${now.toLocaleDateString()}`, 14, 32);
 
-  // Hotel info
-  doc.setFontSize(12);
-  doc.text(`Hôtel: ${this.hotel?.name || '-'}`, 14, 44);
-  doc.setFontSize(10);
-  doc.text(`Lieu: ${this.hotel?.city || '-'} - ${this.hotel?.country || '-'}`, 14, 50);
+//   // Hotel info
+//   doc.setFontSize(12);
+//   doc.text(`Hôtel: ${this.hotel?.name || '-'}`, 14, 44);
+//   doc.setFontSize(10);
+//   doc.text(`Lieu: ${this.hotel?.city || '-'} - ${this.hotel?.country || '-'}`, 14, 50);
 
-  // Booking info
-  doc.text(`Arrivée: ${this.booking.checkin}`, 14, 60);
-  doc.text(`Départ: ${this.booking.checkout}`, 14, 66);
-  doc.text(`Nuits: ${nights}`, 14, 72);
+//   // Booking info
+//   doc.text(`Arrivée: ${this.booking.checkin}`, 14, 60);
+//   doc.text(`Départ: ${this.booking.checkout}`, 14, 66);
+//   doc.text(`Nuits: ${nights}`, 14, 72);
 
-  doc.text(`Formule: ${this.mealPlanLabel(this.booking.mealPlan)}`, 14, 80);
-  doc.text(`Supplément formule: ${planExtra} TND / personne / nuit`, 14, 86);
+//   doc.text(`Formule: ${this.mealPlanLabel(this.booking.mealPlan)}`, 14, 80);
+//   doc.text(`Supplément formule: ${planExtra} TND / personne / nuit`, 14, 86);
 
-  // Table
-  const rows = this.bookingRooms.map((br, i) => {
-    const guests = this.getRoomGuests(br); // adults + children
-    const roomBase = this.getRoomBasePerNight(br);
-    const meal = this.getRoomMealExtraPerNight(br);
-    const perNight = roomBase + meal;
+//   // Table
+//   const rows = this.bookingRooms.map((br, i) => {
+//     const guests = this.getRoomGuests(br); // adults + children
+//     const roomBase = this.getRoomBasePerNight(br);
+//     const meal = this.getRoomMealExtraPerNight(br);
+//     const perNight = roomBase + meal;
 
-    return [
-      `${i + 1}`,
-      br.room?.name || 'Chambre',
-      `${br.adults || 0}`,
-      `${br.children || 0}`,
-      `${br.babies || 0}`,
-      `${guests}`,
-      `${(br.room.price || 0).toFixed(2)} TND`,
-      `${roomBase.toFixed(2)} TND`,
-      `${meal.toFixed(2)} TND`,
-      `${perNight.toFixed(2)} TND`,
-    ];
-  });
+//     return [
+//       `${i + 1}`,
+//       br.room?.name || 'Chambre',
+//       `${br.adults || 0}`,
+//       `${br.children || 0}`,
+//       `${br.babies || 0}`,
+//       `${guests}`,
+//       `${(br.room.price || 0).toFixed(2)} TND`,
+//       `${roomBase.toFixed(2)} TND`,
+//       `${meal.toFixed(2)} TND`,
+//       `${perNight.toFixed(2)} TND`,
+//     ];
+//   });
 
-  autoTable(doc, {
-    startY: 96,
-    head: [[
-      '#', 'Chambre', 'Adultes', 'Enfants', 'Bébés', 'Payants',
-      'Prix/pers', 'Chambre/nuit', 'Formule/nuit', 'Total/nuit'
-    ]],
-    body: rows,
-    styles: { fontSize: 8 },
-  });
+//   autoTable(doc, {
+//     startY: 96,
+//     head: [[
+//       '#', 'Chambre', 'Adultes', 'Enfants', 'Bébés', 'Payants',
+//       'Prix/pers', 'Chambre/nuit', 'Formule/nuit', 'Total/nuit'
+//     ]],
+//     body: rows,
+//     styles: { fontSize: 8 },
+//   });
 
-  const finalY = (doc as any).lastAutoTable?.finalY || 96;
+//   const finalY = (doc as any).lastAutoTable?.finalY || 96;
 
-  doc.setFontSize(12);
-  doc.text(`Total / nuit: ${totalPerNight.toFixed(2)} TND`, 14, finalY + 14);
-  doc.text(`Total (${nights} nuits): ${total.toFixed(2)} TND`, 14, finalY + 22);
+//   doc.setFontSize(12);
+//   doc.text(`Total / nuit: ${totalPerNight.toFixed(2)} TND`, 14, finalY + 14);
+//   doc.text(`Total (${nights} nuits): ${total.toFixed(2)} TND`, 14, finalY + 22);
 
-  doc.setFontSize(9);
-  doc.text(`Note: Les bébés (0-2 ans) ne sont pas inclus dans la capacité ni dans le prix.`, 14, finalY + 32);
+//   doc.setFontSize(9);
+//   doc.text(`Note: Les bébés (0-2 ans) ne sont pas inclus dans la capacité ni dans le prix.`, 14, finalY + 32);
 
-  doc.save(`${factureNumber}.pdf`);
-}
+//   doc.save(`${factureNumber}.pdf`);
+// }
 
 onCheckinChange() {
   if (this.booking.checkout && this.booking.checkout < this.booking.checkin) {
     this.booking.checkout = '';
   }
+}
+
+
+lastReservationId: number | null = null;
+async downloadLatestFacture() {
+  if (!this.lastReservationId) return;
+  try {
+    await this.invoiceService.downloadInvoicePdf(this.lastReservationId);
+  } catch (e) {
+    this.bookingMessageType = 'error';
+    this.bookingMessage = "Impossible de télécharger la facture.";
+  }
+}
+
+imageUrl(img: string | null | undefined): string {
+  if (!img) return 'images/default.jpg';
+
+  if (img.startsWith('http://') || img.startsWith('https://')) return img;
+
+  return 'images/' + img;
 }
 }

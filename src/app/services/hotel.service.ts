@@ -54,12 +54,28 @@ export class HotelService {
   async reserveHotel(payload: any): Promise<any> {
   const token = localStorage.getItem('token');
 
-  const res = await axios.post('http://localhost:9090/api/reservations', payload, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {}
-  });
+  const res = await axios.post(
+    'http://localhost:9090/api/reservations',
+    payload,
+    {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        'Content-Type': 'application/json',
+      },
+    }
+  );
 
-  return res.data;
+  const raw = res.data;
+  const obj = typeof raw === 'string' ? JSON.parse(raw) : raw;
+
+  console.log("RESERVE OBJ =", obj);
+  console.log("RESERVE ID =", obj?.id);
+
+  return obj;
 }
+
+
+
 
 
 }

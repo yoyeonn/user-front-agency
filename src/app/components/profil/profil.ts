@@ -1,182 +1,17 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule, HttpHeaders } from '@angular/common/http';
-import { ChangeDetectorRef } from '@angular/core';
-import {
-  FormBuilder,
-  ReactiveFormsModule,
-  Validators,
-  AbstractControl,
-  ValidationErrors,
-} from '@angular/forms';
-
+import {FormBuilder,ReactiveFormsModule,Validators,AbstractControl,ValidationErrors,} from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { ReservationRow, ReservationService } from '../../services/reservation.service';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { InvoiceService } from '../../services/invoice.service';
+import { DestinationReservationRow, DestinationReservationService } from '../../services/destination-reservation.service';
+import { DestinationInvoiceService } from '../../services/destination-invoice.service';
+import { PackReservationRow, PackReservationService } from '../../services/pack-reservation.service';
+import { PackInvoiceService } from '../../services/pack-invoice.service';
 
-type InvoiceJson = {
-  roomPrices: string;   // "140.5,180.5,100.0"
-  roomIds: string;      // "1,2,3"
-  roomNames: string;    // "Double..., Family..., Standard..."
-  adults: number;
-  children: number;
-  babies: number;
-  hotelId: number;
-  hotelName: string;
-  createdAt: string;    // ISO
-  totalAmount: number;
-  checkIn: string;      // "YYYY-MM-DD"
-  checkOut: string;     // "YYYY-MM-DD"
-  id: number;           // reservation id
-  mealPlan: string;     // "AI"
-};
+declare var $: any;
 
-type RoomLine = {
-  roomId: number | null;
-  roomName: string;
-  pricePerPerson: number;   // from roomPrices
-};
-function downloadFacturePdfFromJson(data: any) {
-  const doc = new jsPDF();
-
-  // ---- helpers ----
-  const parseCsv = (s: string) =>
-    (s || '')
-      .split(',')
-      .map(x => x.trim())
-      .filter(x => x.length > 0);
-
-  const parseRoomLines = (d: InvoiceJson): RoomLine[] => {
-    const ids = parseCsv(d.roomIds).map(v => Number(v));
-    const names = parseCsv(d.roomNames);
-    const prices = parseCsv(d.roomPrices).map(v => Number(v));
-
-    const n = Math.max(ids.length, names.length, prices.length);
-    const lines: RoomLine[] = [];
-
-    for (let i = 0; i < n; i++) {
-      lines.push({
-        roomId: Number.isFinite(ids[i]) ? ids[i] : null,
-        roomName: names[i] ?? `Chambre ${i + 1}`,
-        pricePerPerson: Number.isFinite(prices[i]) ? prices[i] : 0,
-      });
-    }
-    return lines;
-  };
-
-  const daysBetween = (checkIn: string, checkOut: string) => {
-    // Parse as local midnight to avoid timezone shifts
-    const [y1, m1, d1] = checkIn.split('-').map(Number);
-    const [y2, m2, d2] = checkOut.split('-').map(Number);
-    const a = new Date(y1, (m1 || 1) - 1, d1 || 1);
-    const b = new Date(y2, (m2 || 1) - 1, d2 || 1);
-    const ms = b.getTime() - a.getTime();
-    return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)));
-  };
-
-  const mealPlanLabel = (plan: string) => {
-    switch (plan) {
-      case 'ROOM_ONLY': return 'Chambre';
-      case 'BB': return 'Petit-déjeuner';
-      case 'HB': return 'Demi-pension';
-      case 'FB': return 'Pension complète';
-      case 'AI': return 'Tout compris';
-      case 'UAI': return 'Ultra tout compris';
-      default: return plan || '-';
-    }
-  };
-
-  // If you still have your own logic, plug it here.
-  // With your JSON we don't have enough info to compute per-room meal extras,
-  // so we keep it at 0 unless you define it.
-  const mealPlanExtra = (_plan: string) => 0; // TND / person / night
-
-  // ---- data ----
-  const now = new Date();
-  const factureNumber = `FAC-${data.id}`; // or `${now.getTime()}`
-  const nights = daysBetween(data.checkIn, data.checkOut);
-  const planExtra = mealPlanExtra(data.mealPlan);
-
-  const rooms = parseRoomLines(data);
-
-  // distribute total paying guests across rooms (best-effort)
-  const payingGuestsTotal = (data.adults || 0) + (data.children || 0);
-  const perRoomGuests = rooms.length > 0 ? Math.floor(payingGuestsTotal / rooms.length) : 0;
-  let remainder = rooms.length > 0 ? (payingGuestsTotal % rooms.length) : 0;
-
-  const roomRows = rooms.map((r, i) => {
-    const guests = perRoomGuests + (remainder > 0 ? 1 : 0);
-    if (remainder > 0) remainder--;
-
-    const adults = i === 0 ? (data.adults || 0) : 0;       // reservation-level info
-    const children = i === 0 ? (data.children || 0) : 0;   // shown once (optional)
-    const babies = i === 0 ? (data.babies || 0) : 0;
-
-    // We ONLY know "pricePerPerson" from roomPrices. So:
-    const roomBasePerNight = r.pricePerPerson * guests;
-    const mealPerNight = planExtra * guests;
-    const totalPerNight = roomBasePerNight + mealPerNight;
-
-    return [
-      `${i + 1}`,
-      r.roomName,
-      `${adults}`,
-      `${children}`,
-      `${babies}`,
-      `${guests}`,
-      `${r.pricePerPerson.toFixed(2)} TND`,
-      `${roomBasePerNight.toFixed(2)} TND`,
-      `${mealPerNight.toFixed(2)} TND`,
-      `${totalPerNight.toFixed(2)} TND`,
-    ];
-  });
-
-  // If backend already gives totalAmount, we can trust it:
-  const total = Number(data.totalAmount) || 0;
-  const totalPerNight = nights > 0 ? total / nights : total;
-
-  // ---- PDF ----
-  doc.setFontSize(16);
-  doc.text('FACTURE - Réservation Hôtel', 14, 18);
-
-  doc.setFontSize(10);
-  doc.text(`N° Facture: ${factureNumber}`, 14, 26);
-  doc.text(`Date: ${now.toLocaleDateString()}`, 14, 32);
-
-  doc.setFontSize(12);
-  doc.text(`Hôtel: ${data.hotelName || '-'}`, 14, 44);
-  doc.setFontSize(10);
-  doc.text(`ID Hôtel: ${data.hotelId ?? '-'}`, 14, 50);
-
-  doc.text(`Arrivée: ${data.checkIn}`, 14, 60);
-  doc.text(`Départ: ${data.checkOut}`, 14, 66);
-  doc.text(`Nuits: ${nights}`, 14, 72);
-
-  doc.text(`Formule: ${mealPlanLabel(data.mealPlan)}`, 14, 80);
-  doc.text(`Supplément formule: ${planExtra.toFixed(2)} TND / personne / nuit`, 14, 86);
-
-  autoTable(doc, {
-    startY: 96,
-    head: [[
-      '#', 'Chambre', 'Adultes', 'Enfants', 'Bébés', 'Payants',
-      'Prix/pers', 'Chambre/nuit', 'Formule/nuit', 'Total/nuit'
-    ]],
-    body: roomRows,
-    styles: { fontSize: 8 },
-  });
-
-  const finalY = (doc as any).lastAutoTable?.finalY || 96;
-
-  doc.setFontSize(12);
-  doc.text(`Total / nuit: ${totalPerNight.toFixed(2)} TND`, 14, finalY + 14);
-  doc.text(`Total (${nights} nuits): ${total.toFixed(2)} TND`, 14, finalY + 22);
-
-  doc.setFontSize(9);
-  doc.text(`Note: Les bébés (0-2 ans) ne sont pas inclus dans la capacité ni dans le prix.`, 14, finalY + 32);
-
-  doc.save(`${factureNumber}.pdf`);
-}
 function matchPasswords(group: AbstractControl): ValidationErrors | null {
   const np = group.get('newPassword')?.value;
   const cp = group.get('confirmPassword')?.value;
@@ -192,6 +27,60 @@ function matchPasswords(group: AbstractControl): ValidationErrors | null {
   styleUrl: './profil.css',
 })
 export class Profil implements OnInit {
+  ngAfterViewInit(): void {
+    this.contentWayPoint();
+    this.initOwlCarousel();
+
+    this.cdr.detectChanges();
+  }
+
+  private contentWayPoint(): void {
+    if ($('.ftco-animate').length === 0) return;
+
+    $('.ftco-animate').toArray().forEach((el: HTMLElement) => {
+      const $el = $(el);
+      $el.waypoint((direction: string) => {
+        if (direction === 'down' && !$el.hasClass('ftco-animated')) {
+          $el.addClass('item-animate');
+          setTimeout(() => {
+            $('body .ftco-animate.item-animate').toArray().forEach((el2: HTMLElement, k: number) => {
+              const $el2 = $(el2);
+              const effect = $el2.data('animate-effect');
+              if (effect === 'fadeIn') $el2.addClass('fadeIn ftco-animated');
+              else if (effect === 'fadeInLeft') $el2.addClass('fadeInLeft ftco-animated');
+              else if (effect === 'fadeInRight') $el2.addClass('fadeInRight ftco-animated');
+              else $el2.addClass('fadeInUp ftco-animated');
+
+              $el2.removeClass('item-animate');
+            });
+          }, 100);
+        }
+      }, { offset: '95%' });
+    });
+    
+    setTimeout(() => {
+      $(window).trigger('resize').trigger('scroll');
+    }, 100);
+  }
+
+  private initOwlCarousel(): void {
+    // Make sure jQuery and Owl Carousel are loaded
+    if ($('.owl-carousel').length === 0) return;
+
+    $('.owl-carousel').owlCarousel({
+      loop: true,
+      margin: 30,
+      nav: true,
+      dots: true,
+      autoplay: true,
+      autoplayTimeout: 3000,
+      responsive: {
+        0: { items: 1 },
+        600: { items: 2 },
+        1000: { items: 3 }
+      }
+    });
+  }
   user: any = null;
 
   reservations: ReservationRow[] = [];
@@ -203,12 +92,25 @@ export class Profil implements OnInit {
 
   pwdForm;
 
+  packReservations: PackReservationRow[] = [];
+
+  // ✅ NEW: show loading per reservation download
+  downloadingId: number | null = null;
+
+  destinationReservations: DestinationReservationRow[] = [];
+
   constructor(
     private auth: AuthService,
     private reservationService: ReservationService,
     private fb: FormBuilder,
     private http: HttpClient,
-      private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private invoiceService: InvoiceService,
+    private destResService: DestinationReservationService,
+    private destInvoiceService: DestinationInvoiceService,
+    private packResService: PackReservationService,
+    private packInvoiceService: PackInvoiceService,
+
   ) {
     this.pwdForm = this.fb.group(
       {
@@ -228,22 +130,19 @@ export class Profil implements OnInit {
   async loadReservations() {
   this.loading = true;
   this.error = '';
-  this.cdr.markForCheck(); // (safe) update UI immediately
+  this.cdr.markForCheck();
 
   try {
     this.reservations = await this.reservationService.getMyReservations();
-    console.log(this.reservations);
+    this.destinationReservations = await this.destResService.getMyDestinationReservations();
+    this.packReservations = await this.packResService.getMyPackReservations();
   } catch (e: any) {
     this.error = e?.error?.message || e?.message || 'Erreur chargement historique.';
   } finally {
     this.loading = false;
-
-    // Force UI refresh right now (this fixes “updates only after click”)
     this.cdr.detectChanges();
-    // or use this.cdr.markForCheck(); (usually enough for OnPush)
   }
 }
-
 
   mealPlanLabel(plan: string) {
     switch (plan) {
@@ -257,26 +156,33 @@ export class Profil implements OnInit {
     }
   }
 
+  // ✅ Use the same InvoiceService PDF style (the fixed one)
   async onDownload(r: ReservationRow) {
-    try {
-      const result = await this.reservationService.downloadInvoice(r.id);
-      console.log(result);
-      downloadFacturePdfFromJson(result);
+    this.downloadingId = r.id;
+    this.cdr.markForCheck();
 
+    try {
+      await this.invoiceService.downloadInvoicePdf(r.id);
     } catch (e: any) {
-      alert(e?.error?.message || e?.message || 'Téléchargement échoué.');
+      console.error(e);
+      alert(e?.response?.data?.message || e?.message || 'Téléchargement échoué.');
+    } finally {
+      this.downloadingId = null;
+      this.cdr.markForCheck();
     }
   }
 
   async onChangePassword() {
     this.pwdMsg = '';
     this.pwdForm.markAllAsTouched();
+    this.cdr.markForCheck();
 
     if (this.pwdForm.invalid) {
       this.pwdMsgType = 'error';
       this.pwdMsg = this.pwdForm.errors?.['mismatch']
         ? 'Confirmation incorrecte.'
         : 'Remplir tous les champs.';
+        this.cdr.detectChanges();
       return;
     }
 
@@ -284,27 +190,48 @@ export class Profil implements OnInit {
     const newPassword = (this.pwdForm.value.newPassword || '').trim();
 
     const token = localStorage.getItem('token');
-
     const headers = token
       ? new HttpHeaders({ Authorization: `Bearer ${token}` })
       : new HttpHeaders();
 
     try {
-      // HttpClient returns Observable -> convert to Promise
-      await this.http
-        .post(
-          'http://localhost:9090/api/auth/change-password',
-          { currentPassword, newPassword },
-          { headers }
-        )
-        .toPromise();
+      await this.http.post(
+  'http://localhost:9090/api/auth/change-password',
+  { currentPassword, newPassword },
+  { headers, responseType: 'text' }
+).toPromise();
 
       this.pwdMsgType = 'success';
       this.pwdMsg = 'Mot de passe changé ✅';
       this.pwdForm.reset();
     } catch (e: any) {
-      this.pwdMsgType = 'error';
-      this.pwdMsg = e?.error || e?.error?.message || 'Erreur changement mot de passe.';
-    }
+  this.pwdMsgType = 'error';
+
+  this.pwdMsg =
+    typeof e?.error === 'string'
+      ? e.error
+      : (e?.error?.message || 'Erreur changement mot de passe.');
+} finally {
+    this.cdr.detectChanges();
   }
+  }
+
+  async onDownloadDestination(r: DestinationReservationRow) {
+  try {
+    await this.destInvoiceService.downloadDestinationInvoicePdf(r.id);
+  } catch (e: any) {
+    console.error(e);
+    alert(e?.error?.message || e?.message || 'Téléchargement échoué (destination).');
+  }
+}
+
+async onDownloadPack(r: PackReservationRow) {
+  try {
+    await this.packInvoiceService.downloadPackInvoicePdf(r.id);
+  } catch (e: any) {
+    console.error(e);
+    alert(e?.message || 'Téléchargement échoué (pack).');
+  }
+}
+
 }

@@ -53,4 +53,13 @@ export class AuthService {
     this.isLoggedInSubject.next(false);
     this.currentUserSubject.next(null);
   }
+
+  forgotPassword(email: string) {
+  return this.http.post(`${this.BASE_URL}/forgot-password`, { email }, { responseType: 'text' });
+}
+
+resetPassword(token: string, newPassword: string) {
+  return this.http.post(`${this.BASE_URL}/reset-password`, { token, newPassword }, { responseType: 'text' });
+}
+
 }
