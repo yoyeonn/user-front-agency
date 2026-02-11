@@ -40,10 +40,6 @@
       <h3><a [routerLink]="['/packs', pack.id]">{{ pack.name }}</a></h3>
       <p class="description text-muted">{{ pack.description }}</p>
       <p class="text-muted"><span class="fa fa-map-marker"></span> {{pack.country}} - {{pack.location}}</p>
-      <!-- Activities: first 3 only -->
-      <ul *ngIf="pack.activities.length" class="mt-auto">
-        <li *ngFor="let act of pack.activities | slice:0:3">{{ act.activity }}</li>
-      </ul>
     </div>
   </div>
 </div>

@@ -101,7 +101,7 @@ h4::after { content: ''; position: absolute; width: 40px; height: 3px; backgroun
 
 /* title fixed height (2 lines max) */
 .room-card .card-body h5 {
-  min-height: 48px;
+  min-height: 52px;
   margin-bottom: 8px;
 
   display: -webkit-box;
@@ -116,7 +116,7 @@ h4::after { content: ''; position: absolute; width: 40px; height: 3px; backgroun
   margin-bottom: 10px;
 
   display: -webkit-box;
-  -webkit-line-clamp: 2;        /* change to 3 if you want */
+  -webkit-line-clamp: 4;        /* change to 3 if you want */
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
